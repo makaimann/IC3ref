@@ -117,6 +117,7 @@ void Model::loadTransitionRelation(Minisat::Solver & slv, bool primeConstraints)
       if (require.find(i->lhs) == require.end() 
           && require.find(~i->lhs) == require.end())
         continue;
+      // Makai: this is encoding an AND from the AIGER
       // encode into CNF
       sslv->addClause(~i->lhs, i->rhs0);
       sslv->addClause(~i->lhs, i->rhs1);
@@ -128,6 +129,7 @@ void Model::loadTransitionRelation(Minisat::Solver & slv, bool primeConstraints)
       if (prequire.find(i->lhs) == prequire.end()
           && prequire.find(~i->lhs) == prequire.end())
         continue;
+      // Makai: same thing for primed
       // encode PRIMED form into CNF
       Minisat::Lit r0 = primeLit(i->lhs, sslv), 
         r1 = primeLit(i->rhs0, sslv), 
@@ -147,6 +149,7 @@ void Model::loadTransitionRelation(Minisat::Solver & slv, bool primeConstraints)
          i != constraints.end(); ++i) {
       sslv->addClause(*i);
     }
+    // Makai: the update functions (comment below explains well)
     // assert l' = f for each latch l
     for (VarVec::const_iterator i = beginLatches(); i != endLatches(); ++i) {
       Minisat::Lit platch = primeLit(i->lit(false)), f = nextStateFn(*i);
@@ -155,6 +158,8 @@ void Model::loadTransitionRelation(Minisat::Solver & slv, bool primeConstraints)
     }
     sslv->eliminate(true);
   }
+  // Makai: this is adding to the regular solver instance
+  // Makai: we can likely use this form -- i.e. post simplification
   // load the clauses from the simplified context
   while (slv.nVars() < sslv->nVars()) slv.newVar();
   for (Minisat::ClauseIterator c = sslv->clausesBegin(); 
@@ -172,6 +177,9 @@ void Model::loadTransitionRelation(Minisat::Solver & slv, bool primeConstraints)
     for (LitVec::const_iterator i = constraints.begin(); 
          i != constraints.end(); ++i)
       slv.addClause(primeLit(*i));
+  // Makai: can likely include an option to print here using toDimacs
+  // Makai: Need to make sure it's JUST the transition relation and not
+  //        also the frames (we want the TR and frame[N] separately)
 }
 
 void Model::loadInitialCondition(Minisat::Solver & slv) const {
