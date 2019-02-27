@@ -92,9 +92,11 @@ int main(int argc, char ** argv) {
   }
 
   // model check it
-  bool rv = IC3::check(*model, verbose, basic, random);
+  IC3::Result res = IC3::check(*model, verbose, basic, random);
   // print 0/1 according to AIGER standard
-  cout << !rv << endl;
+  cout << !res.rv << endl;
+
+  // Makai: do something if asked to dump invariant (and result is true)
 
   delete model;
 

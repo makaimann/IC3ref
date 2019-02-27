@@ -28,7 +28,43 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace IC3 {
 
-  bool check(Model & model, 
+  // Makai: adding CubeSet for Result struct
+  // A CubeSet is a set of ordered (by integer value) vectors of
+  // Minisat::Lits.
+  static bool _LitVecComp(const LitVec & v1, const LitVec & v2) {
+    if (v1.size() < v2.size()) return true;
+    if (v1.size() > v2.size()) return false;
+    for (size_t i = 0; i < v1.size(); ++i) {
+      if (v1[i] < v2[i]) return true;
+      if (v2[i] < v1[i]) return false;
+    }
+    return false;
+  }
+  static bool _LitVecEq(const LitVec & v1, const LitVec & v2) {
+    if (v1.size() != v2.size()) return false;
+    for (size_t i = 0; i < v1.size(); ++i)
+      if (v1[i] != v2[i]) return false;
+    return true;
+  }
+  class LitVecComp {
+  public:
+    bool operator()(const LitVec & v1, const LitVec & v2) {
+      return _LitVecComp(v1, v2);
+    }
+  };
+
+  typedef set<LitVec, LitVecComp> CubeSet;
+
+  // Makai: tracking more information than just return value
+  struct Result {
+  Result(bool _rv, size_t _k, CubeSet _inv) :
+    rv(_rv), k(_k), inv(_inv) {}
+    bool rv; // Return value
+    size_t k; // last frame number
+    CubeSet inv; // invariant cubes of last frame (need to be negated)
+  };
+
+  Result check(Model & model, 
              int verbose = 0,       // 0: silent, 1: stats, 2: informative
              bool basic = false,    // simple inductive generalization
              bool random = false);  // random runs for statistical profiling

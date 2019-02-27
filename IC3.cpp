@@ -160,13 +160,16 @@ namespace IC3 {
     }
 
     // The main loop.
-    bool check() {
+    Result check() {
       startTime = time();  // stats
       while (true) {
         if (verbose > 1) cout << "Level " << k << endl;
         extend();                         // push frontier frame
-        if (!strengthen()) return false;  // strengthen to remove bad successors
-        if (propagate()) return true;     // propagate clauses; check for proof
+        // Makai: modifying return value
+        // strengthen to remove bad successors
+        if (!strengthen()) return Result(false, k, CubeSet());
+        // propagate clauses; check for proof
+        if (propagate()) return Result(true, k, frames[k].borderCubes);
         printStats();
         ++k;                              // increment frontier
       }
@@ -243,30 +246,33 @@ namespace IC3 {
       nextState = 0;
     }
 
+    // Makai: moving to header for a modifed return value
+    //        which also returns the invariants from the last frame
+
     // A CubeSet is a set of ordered (by integer value) vectors of
     // Minisat::Lits.
-    static bool _LitVecComp(const LitVec & v1, const LitVec & v2) {
-      if (v1.size() < v2.size()) return true;
-      if (v1.size() > v2.size()) return false;
-      for (size_t i = 0; i < v1.size(); ++i) {
-        if (v1[i] < v2[i]) return true;
-        if (v2[i] < v1[i]) return false;
-      }
-      return false;
-    }
-    static bool _LitVecEq(const LitVec & v1, const LitVec & v2) {
-      if (v1.size() != v2.size()) return false;
-      for (size_t i = 0; i < v1.size(); ++i)
-        if (v1[i] != v2[i]) return false;
-      return true;
-    }
-    class LitVecComp {
-    public:
-      bool operator()(const LitVec & v1, const LitVec & v2) {
-        return _LitVecComp(v1, v2);
-      }
-    };
-    typedef set<LitVec, LitVecComp> CubeSet;
+    // static bool _LitVecComp(const LitVec & v1, const LitVec & v2) {
+    //   if (v1.size() < v2.size()) return true;
+    //   if (v1.size() > v2.size()) return false;
+    //   for (size_t i = 0; i < v1.size(); ++i) {
+    //     if (v1[i] < v2[i]) return true;
+    //     if (v2[i] < v1[i]) return false;
+    //   }
+    //   return false;
+    // }
+    // static bool _LitVecEq(const LitVec & v1, const LitVec & v2) {
+    //   if (v1.size() != v2.size()) return false;
+    //   for (size_t i = 0; i < v1.size(); ++i)
+    //     if (v1[i] != v2[i]) return false;
+    //   return true;
+    // }
+    // class LitVecComp {
+    // public:
+    //   bool operator()(const LitVec & v1, const LitVec & v2) {
+    //     return _LitVecComp(v1, v2);
+    //   }
+    // };
+    //    typedef set<LitVec, LitVecComp> CubeSet;
 
     // A proof obligation.
     struct Obligation {
@@ -814,7 +820,7 @@ namespace IC3 {
       if (numUpdates) cout << ". Avg lits/cls: " << numLits / numUpdates << endl;
     }
 
-    friend bool check(Model &, int, bool, bool);
+    friend Result check(Model &, int, bool, bool);
 
   };
 
@@ -841,9 +847,9 @@ namespace IC3 {
   }
 
   // External function to make the magic happen.
-  bool check(Model & model, int verbose, bool basic, bool random) {
+  Result check(Model & model, int verbose, bool basic, bool random) {
     if (!baseCases(model))
-      return false;
+      return Result(false, 1, CubeSet());
     IC3 ic3(model);
     ic3.verbose = verbose;
     if (basic) {
@@ -852,10 +858,10 @@ namespace IC3 {
       ic3.maxCTGs = 0;
     }
     if (random) ic3.random = true;
-    bool rv = ic3.check();
-    if (!rv && verbose > 1) ic3.printWitness();
+    Result res = ic3.check();
+    if (!res.rv && verbose > 1) ic3.printWitness();
     if (verbose) ic3.printStats();
-    return rv;
+    return res;
   }
 
 }
