@@ -87,6 +87,9 @@ int main(int argc, char ** argv) {
   aiger_reset(aig);
   if (!model) return 0;
 
+  // model check it
+  IC3::Result res = IC3::check(*model, verbose, basic, random);
+
   // Makai: dump cnf if asked
   if (dumpTrans) {
     cout << "dumping CNF transition relation to file: " << transFilename << endl;
@@ -96,31 +99,31 @@ int main(int argc, char ** argv) {
     trDumper->toDimacs(transFilename.c_str());
   }
 
-  // model check it
-  IC3::Result res = IC3::check(*model, verbose, basic, random);
-  // print 0/1 according to AIGER standard
-  cout << !res.rv << endl;
-
   // Makai: do something if asked to dump invariant (and result is true)
   if (dumpInv) {
     if (!res.rv) {
       cout << "asked to dump invariant but property does not hold -- aborting." << endl;
     }
     else {
+      // debugging
+      cout << "Found " << res.inv.size() << " invariant clauses." << endl;
       cout << "dumping CNF invariant to file: " << invFilename << endl;
       Minisat::Solver * invDumper = model->newSolver();
-      for (IC3::CubeSet::iterator cube = res.inv.begin(); cube != res.inv.end();) {
-        cout << "in outer for loop" << endl;
+      for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
         const LitVec & lcube = *cube;
         Minisat::vec<Minisat::Lit> cls;
-        for (LitVec::const_iterator i = lcube.begin(); i != lcube.begin(); ++i) {
-          cls.push(~*i);
+        cls.capacity(lcube.size());
+        for (unsigned int i = 0; i < lcube.size(); ++i) {
+          cls.push(~lcube[i]);
         }
-        invDumper->addClause_(cls);
+        invDumper->addClause(cls);
       }
       invDumper->toDimacs(invFilename.c_str());
     }
   }
+
+  // print 0/1 according to AIGER standard
+  cout << !res.rv << endl;
 
   delete model;
 
