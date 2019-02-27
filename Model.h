@@ -94,10 +94,10 @@ public:
   Model(vector<Var> _vars, 
         size_t _inputs, size_t _latches, size_t _reps, 
         LitVec _init, LitVec _constraints, LitVec _nextStateFns, 
-        Minisat::Lit _err, AigVec _aig, bool _dumpTrans) :
+        Minisat::Lit _err, AigVec _aig) :
     vars(_vars), 
     inputs(_inputs), latches(_latches), reps(_reps),
-    primes(_vars.size()), primesUnlocked(true), aig(_aig), dumpTrans(_dumpTrans),
+    primes(_vars.size()), primesUnlocked(true), aig(_aig),
     init(_init), constraints(_constraints), nextStateFns(_nextStateFns),
     _error(_err), inits(NULL), sslv(NULL)
   {
@@ -219,9 +219,6 @@ private:
   typedef unordered_map<size_t, size_t> IndexMap;
   IndexMap primedAnds;
 
-  // Makai: added for dumping transition relation
-  bool dumpTrans;
-
   const AigVec aig;
   const LitVec init, constraints, nextStateFns;
   const Minisat::Lit _error;
@@ -239,6 +236,6 @@ private:
 };
 
 // The easiest way to create a model.
-Model * modelFromAiger(aiger * aig, unsigned int propertyIndex, bool dumpTrans=false);
+Model * modelFromAiger(aiger * aig, unsigned int propertyIndex);
 
 #endif
