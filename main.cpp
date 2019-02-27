@@ -37,8 +37,8 @@ extern "C" {
 int main(int argc, char ** argv) {
   unsigned int propertyIndex = 0;
   bool basic = false, random = false;
-  bool dumpTrans = false;
-  string transFilename = "";
+  bool dumpTrans = false, dumpInv = false;
+  string transFilename = "", invFilename = "";
   int verbose = 0;
   // Makai: Adding option to dump transition relation and final invariants
   //        (when property holds)
@@ -64,6 +64,12 @@ int main(int argc, char ** argv) {
       string a = string(argv[i]);
       transFilename = a.substr(8, a.length()-8);
     }
+    else if (string(argv[i]).substr(0, 6)=="--inv=") {
+      // option: dump invariant to file
+      dumpInv = true;
+      string a = string(argv[i]);
+      invFilename = a.substr(6, a.length()-6);
+    }
     else
       // optional argument: set property index
       propertyIndex = (unsigned) atoi(argv[i]);
@@ -83,9 +89,8 @@ int main(int argc, char ** argv) {
 
   // Makai: dump cnf if asked
   if (dumpTrans) {
-    cout << "told dump CNF transition relation to file: " << transFilename << endl;
-    Minisat::Solver * trDumper;
-    trDumper = model->newSolver();
+    cout << "dumping CNF transition relation to file: " << transFilename << endl;
+    Minisat::Solver * trDumper = model->newSolver();
     // include primesConstraints
     model->loadTransitionRelation(*trDumper, true);
     trDumper->toDimacs(transFilename.c_str());
@@ -97,6 +102,25 @@ int main(int argc, char ** argv) {
   cout << !res.rv << endl;
 
   // Makai: do something if asked to dump invariant (and result is true)
+  if (dumpInv) {
+    if (!res.rv) {
+      cout << "asked to dump invariant but property does not hold -- aborting." << endl;
+    }
+    else {
+      cout << "dumping CNF invariant to file: " << invFilename << endl;
+      Minisat::Solver * invDumper = model->newSolver();
+      for (IC3::CubeSet::iterator cube = res.inv.begin(); cube != res.inv.end();) {
+        cout << "in outer for loop" << endl;
+        const LitVec & lcube = *cube;
+        Minisat::vec<Minisat::Lit> cls;
+        for (LitVec::const_iterator i = lcube.begin(); i != lcube.begin(); ++i) {
+          cls.push(~*i);
+        }
+        invDumper->addClause_(cls);
+      }
+      invDumper->toDimacs(invFilename.c_str());
+    }
+  }
 
   delete model;
 
