@@ -31,11 +31,14 @@ extern "C" {
 #include "IC3.h"
 #include "Model.h"
 
+// Makai: include solver for dumping transition relation
+#include "Solver.h"
+
 int main(int argc, char ** argv) {
   unsigned int propertyIndex = 0;
   bool basic = false, random = false;
   bool dumpTrans = false;
-  string transFile = "";
+  string transFilename = "";
   int verbose = 0;
   // Makai: Adding option to dump transition relation and final invariants
   //        (when property holds)
@@ -59,8 +62,7 @@ int main(int argc, char ** argv) {
       // option: dump transition relation to file
       dumpTrans = true;
       string a = string(argv[i]);
-      transFile = a.substr(8, a.length()-8);
-      cout << "told dump CNF transition relation to file: " << transFile << endl;
+      transFilename = a.substr(8, a.length()-8);
     }
     else
       // optional argument: set property index
@@ -78,6 +80,16 @@ int main(int argc, char ** argv) {
   Model * model = modelFromAiger(aig, propertyIndex);
   aiger_reset(aig);
   if (!model) return 0;
+
+  // Makai: dump cnf if asked
+  if (dumpTrans) {
+    cout << "told dump CNF transition relation to file: " << transFilename << endl;
+    Minisat::Solver * trDumper;
+    trDumper = model->newSolver();
+    // include primesConstraints
+    model->loadTransitionRelation(*trDumper, true);
+    trDumper->toDimacs(transFilename.c_str());
+  }
 
   // model check it
   bool rv = IC3::check(*model, verbose, basic, random);
