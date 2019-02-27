@@ -160,6 +160,12 @@ void Model::loadTransitionRelation(Minisat::Solver & slv, bool primeConstraints)
   }
   // Makai: this is adding to the regular solver instance
   // Makai: we can likely use this form -- i.e. post simplification
+  // Makai: check dumpTrans boolean var and save all clauses in a vector
+  // Makai: then dump it when done adding transition relation
+  // Makai: I'm not sure how many times this is called -- not sure what
+  //        "this slice of AIG" means...
+  // Makai: Need to make sure it's JUST the transition relation and not
+  //        also the frames (we want the TR and frame[N] separately)
   // load the clauses from the simplified context
   while (slv.nVars() < sslv->nVars()) slv.newVar();
   for (Minisat::ClauseIterator c = sslv->clausesBegin(); 
@@ -177,9 +183,6 @@ void Model::loadTransitionRelation(Minisat::Solver & slv, bool primeConstraints)
     for (LitVec::const_iterator i = constraints.begin(); 
          i != constraints.end(); ++i)
       slv.addClause(primeLit(*i));
-  // Makai: can likely include an option to print here using toDimacs
-  // Makai: Need to make sure it's JUST the transition relation and not
-  //        also the frames (we want the TR and frame[N] separately)
 }
 
 void Model::loadInitialCondition(Minisat::Solver & slv) const {
@@ -271,7 +274,7 @@ Minisat::Lit lit(const VarVec & vars, unsigned int l) {
   return vars[l>>1].lit(aiger_sign(l));
 }
 
-Model * modelFromAiger(aiger * aig, unsigned int propertyIndex) {
+Model * modelFromAiger(aiger * aig, unsigned int propertyIndex, bool dumpTrans) {
   VarVec vars(1, Var("false"));
   LitVec init, constraints, nextStateFns;
 
@@ -326,5 +329,6 @@ Model * modelFromAiger(aiger * aig, unsigned int propertyIndex) {
   return new Model(vars, 
                    offset += 1, offset += aig->num_inputs, 
                    offset + aig->num_latches,
-                   init, constraints, nextStateFns, err, aigv);
+                   init, constraints, nextStateFns, err, aigv,
+                   dumpTrans);
 }

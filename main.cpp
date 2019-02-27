@@ -34,7 +34,11 @@ extern "C" {
 int main(int argc, char ** argv) {
   unsigned int propertyIndex = 0;
   bool basic = false, random = false;
+  bool dumpTrans = false;
+  string transFile = "";
   int verbose = 0;
+  // Makai: Adding option to dump transition relation and final invariants
+  //        (when property holds)
   for (int i = 1; i < argc; ++i) {
     if (string(argv[i]) == "-v")
       // option: verbosity
@@ -51,6 +55,13 @@ int main(int argc, char ** argv) {
     else if (string(argv[i]) == "-b")
       // option: use basic generalization
       basic = true;
+    else if (string(argv[i]).substr(0, 8)=="--trans=") {
+      // option: dump transition relation to file
+      dumpTrans = true;
+      string a = string(argv[i]);
+      transFile = a.substr(8, a.length()-8);
+      cout << "told dump CNF transition relation to file: " << transFile << endl;
+    }
     else
       // optional argument: set property index
       propertyIndex = (unsigned) atoi(argv[i]);
