@@ -22,6 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *********************************************************************/
 
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <time.h>
 
@@ -100,10 +101,30 @@ int main(int argc, char ** argv) {
   // Makai: dump cnf if asked
   if (dumpTrans) {
     cout << "dumping CNF transition relation to file: " << transFilename << endl;
-    Minisat::Solver * trDumper = model->newSolver();
-    // include primesConstraints
-    model->loadTransitionRelation(*trDumper, true);
-    trDumper->toDimacs(transFilename.c_str());
+    string trCnf = "";
+    Minisat::SimpSolver* sslv = model->getSimpSolver();
+    for (Minisat::ClauseIterator c = sslv->clausesBegin(); 
+         c != sslv->clausesEnd(); ++c) {
+      const Minisat::Clause & cls = *c;
+      for (int i = 0; i < cls.size(); ++i) {
+        trCnf += (Minisat::sign(cls[i]) ? "-" : "") +
+          to_string(Minisat::toInt(model->varOfLit(cls[i]).var())) + " ";
+      }
+      trCnf += "0\n";
+    }
+    // not sure if I need the trail?
+    // for (Minisat::TrailIterator c = sslv->trailBegin(); 
+    //      c != sslv->trailEnd(); ++c)
+    //   slv.addClause(*c);
+    LitVec constraints = model->invariantConstraints();
+    for (LitVec::const_iterator i = constraints.begin(); 
+         i != constraints.end(); ++i) {
+      trCnf += (Minisat::sign(model->primeLit(*i)) ? "-" : "") +
+        to_string(Minisat::toInt(model->varOfLit(model->primeLit(*i)).var())) + " 0\n";
+    }
+    ofstream trOut(transFilename);
+    trOut << trCnf;
+    trOut.close();
   }
 
   // Makai: do something if asked to dump invariant (and result is true)
@@ -112,26 +133,27 @@ int main(int argc, char ** argv) {
       cout << "asked to dump invariant but property does not hold -- aborting." << endl;
     }
     else {
-      cout << "Found " << res.inv.size() << " invariant clauses." << endl;
+      cout << "Found " << res.inv.size() << " candidate invariant clauses." << endl;
       cout << "dumping CNF invariant to file: " << invFilename << endl;
       cout << "       and primed CNF to file: " << invPrimedFilename << endl;
-      Minisat::Solver * invDumper = model->newSolver();
-      Minisat::Solver * invPrimedDumper = model->newSolver();
+      string invCnf = "", invPrimedCnf = "";
       for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
         const LitVec & lcube = *cube;
-        Minisat::vec<Minisat::Lit> cls;
-        cls.capacity(lcube.size());
-        Minisat::vec<Minisat::Lit> clsPrimed;
-        clsPrimed.capacity(lcube.size());
         for (unsigned int i = 0; i < lcube.size(); ++i) {
-          cls.push(~lcube[i]);
-          clsPrimed.push(~model->primeLit(lcube[i]));
+          // negating the literals
+          invCnf += (Minisat::sign(lcube[i]) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(lcube[i]).var())) + " ";
+          invPrimedCnf += (Minisat::sign(lcube[i]) ? "" : "-") +
+            to_string(Minisat::toInt(model->varOfLit(model->primeLit(lcube[i])).var())) + " ";
         }
-        invDumper->addClause(cls);
-        invPrimedDumper->addClause(clsPrimed);
+        invCnf += "0\n";
+        invPrimedCnf += "0\n";
       }
-      invDumper->toDimacs(invFilename.c_str());
-      invPrimedDumper->toDimacs(invPrimedFilename.c_str());
+      ofstream invOut(invFilename);
+      ofstream invPrimedOut(invPrimedFilename);
+      invOut << invCnf;
+      invPrimedOut << invPrimedCnf;
+      invOut.close();
+      invPrimedOut.close();
     }
   }
 

@@ -211,6 +211,9 @@ public:
   // if a cube has an initial state.
   bool isInitial(const LitVec & latches);
 
+  // Makai: adding for access in main
+  Minisat::SimpSolver * getSimpSolver() { return sslv; }
+
 private:
   VarVec vars;
   const size_t inputs, latches, reps, primes;
