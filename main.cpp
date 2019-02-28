@@ -38,7 +38,7 @@ int main(int argc, char ** argv) {
   unsigned int propertyIndex = 0;
   bool basic = false, random = false;
   bool dumpTrans = false, dumpInv = false;
-  string transFilename = "", invFilename = "";
+  string transFilename = "", invFilename = "", invPrimedFilename = "";
   int verbose = 0;
   // Makai: Adding option to dump transition relation and final invariants
   //        (when property holds)
@@ -69,6 +69,13 @@ int main(int argc, char ** argv) {
       dumpInv = true;
       string a = string(argv[i]);
       invFilename = a.substr(6, a.length()-6);
+      size_t dotLoc = invFilename.find(".");
+      if (dotLoc == string::npos) {
+        invPrimedFilename = invFilename + "-primed";
+      }
+      else {
+        invPrimedFilename = invFilename.substr(0, dotLoc) + "-primed" + invFilename.substr(dotLoc, invFilename.length()-dotLoc);
+      }
     }
     else
       // optional argument: set property index
@@ -105,20 +112,26 @@ int main(int argc, char ** argv) {
       cout << "asked to dump invariant but property does not hold -- aborting." << endl;
     }
     else {
-      // debugging
       cout << "Found " << res.inv.size() << " invariant clauses." << endl;
       cout << "dumping CNF invariant to file: " << invFilename << endl;
+      cout << "       and primed CNF to file: " << invPrimedFilename << endl;
       Minisat::Solver * invDumper = model->newSolver();
+      Minisat::Solver * invPrimedDumper = model->newSolver();
       for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
         const LitVec & lcube = *cube;
         Minisat::vec<Minisat::Lit> cls;
         cls.capacity(lcube.size());
+        Minisat::vec<Minisat::Lit> clsPrimed;
+        clsPrimed.capacity(lcube.size());
         for (unsigned int i = 0; i < lcube.size(); ++i) {
           cls.push(~lcube[i]);
+          clsPrimed.push(~model->primeLit(lcube[i]));
         }
         invDumper->addClause(cls);
+        invPrimedDumper->addClause(clsPrimed);
       }
       invDumper->toDimacs(invFilename.c_str());
+      invPrimedDumper->toDimacs(invPrimedFilename.c_str());
     }
   }
 
