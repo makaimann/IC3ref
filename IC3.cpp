@@ -169,7 +169,7 @@ namespace IC3 {
         // strengthen to remove bad successors
         if (!strengthen()) return Result(false, k, CubeSet());
         // propagate clauses; check for proof
-        if (propagate()) return Result(true, k, frames[k].borderCubes);
+        if (propagate()) return Result(true, k, frames[fixpointFrame+1].borderCubes);
         printStats();
         ++k;                              // increment frontier
       }
@@ -191,6 +191,9 @@ namespace IC3 {
 
     int verbose; // 0: silent, 1: stats, 2: all
     bool random;
+
+    // Makai: adding to keep track of the propagated frame
+    int fixpointFrame = 0;
 
     string stringOfLitVec(const LitVec & vec) {
       stringstream ss;
@@ -779,8 +782,11 @@ namespace IC3 {
         }
         if (verbose > 1)
           cout << i << " " << ckeep << " " << cprop << " " << cdrop << endl;
-        if (fr.borderCubes.empty())
+        if (fr.borderCubes.empty()) {
+          // Makai: set fixpointFrame and return true
+          fixpointFrame = i;
           return true;
+        }
       }
       // 3. simplify frames
       for (size_t i = trivial ? k : 1; i <= k+1; ++i)
