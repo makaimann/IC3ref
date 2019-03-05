@@ -137,6 +137,13 @@ int main(int argc, char ** argv) {
       cout << "dumping CNF invariant to file: " << invFilename << endl;
       cout << "       and primed CNF to file: " << invPrimedFilename << endl;
       string invCnf = "", invPrimedCnf = "";
+      // dump the property as the first literal
+      invCnf += "c first literal is the property\n";
+      invPrimedCnf += "c first literal is the property\n";
+      Minisat::Lit err = model->error();
+      // property is negated, so complement it
+      invCnf += (Minisat::sign(err) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(err).var())) + " 0\n";
+      invPrimedCnf += (Minisat::sign(err) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(model->primeLit(err)).var())) + " 0\n";
       for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
         const LitVec & lcube = *cube;
         for (unsigned int i = 0; i < lcube.size(); ++i) {
