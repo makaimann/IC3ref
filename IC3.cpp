@@ -169,7 +169,15 @@ namespace IC3 {
         // strengthen to remove bad successors
         if (!strengthen()) return Result(false, k, CubeSet());
         // propagate clauses; check for proof
-        if (propagate()) return Result(true, k, frames[fixpointFrame+1].borderCubes);
+        if (propagate()) {
+          CubeSet cand_invars;
+          for(unsigned int i = fixpointFrame+1; i < frames.size(); ++i) {
+            for (CubeSet::const_iterator cube = frames[i].borderCubes.begin(); cube != frames[i].borderCubes.end(); ++cube) {
+              cand_invars.insert(*cube);
+            }
+          }
+          return Result(true, k, cand_invars);
+        }
         printStats();
         ++k;                              // increment frontier
       }
