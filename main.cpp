@@ -108,19 +108,21 @@ int main(int argc, char ** argv) {
       const Minisat::Clause & cls = *c;
       for (int i = 0; i < cls.size(); ++i) {
         trCnf += (Minisat::sign(cls[i]) ? "-" : "") +
-          to_string(Minisat::toInt(model->varOfLit(cls[i]).var())) + " ";
+          to_string(Minisat::toInt(model->varOfLit(cls[i]).var())+1) + " ";
       }
       trCnf += "0\n";
     }
     // not sure if I need the trail?
-    // for (Minisat::TrailIterator c = sslv->trailBegin(); 
-    //      c != sslv->trailEnd(); ++c)
-    //   slv.addClause(*c);
+    for (Minisat::TrailIterator c = sslv->trailBegin();
+         c != sslv->trailEnd(); ++c) {
+      trCnf += (Minisat::sign(*c) ? "-" : "") +
+        to_string(Minisat::toInt(model->varOfLit(*c).var())+1) + " 0\n";
+    }
     LitVec constraints = model->invariantConstraints();
     for (LitVec::const_iterator i = constraints.begin(); 
          i != constraints.end(); ++i) {
       trCnf += (Minisat::sign(model->primeLit(*i)) ? "-" : "") +
-        to_string(Minisat::toInt(model->varOfLit(model->primeLit(*i)).var())) + " 0\n";
+        to_string(Minisat::toInt(model->varOfLit(model->primeLit(*i)).var())+1) + " 0\n";
     }
     ofstream trOut(transFilename);
     trOut << trCnf;
@@ -142,15 +144,15 @@ int main(int argc, char ** argv) {
       invPrimedCnf += "c first literal is the property\n";
       Minisat::Lit err = model->error();
       // property is negated, so complement it
-      invCnf += (Minisat::sign(err) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(err).var())) + " 0\n";
-      invPrimedCnf += (Minisat::sign(err) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(model->primeLit(err)).var())) + " 0\n";
+      invCnf += (Minisat::sign(err) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(err).var())+1) + " 0\n";
+      invPrimedCnf += (Minisat::sign(err) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(model->primeLit(err)).var())+1) + " 0\n";
       for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
         const LitVec & lcube = *cube;
         for (unsigned int i = 0; i < lcube.size(); ++i) {
           // negating the literals
-          invCnf += (Minisat::sign(lcube[i]) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(lcube[i]).var())) + " ";
+          invCnf += (Minisat::sign(lcube[i]) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(lcube[i]).var())+1) + " ";
           invPrimedCnf += (Minisat::sign(lcube[i]) ? "" : "-") +
-            to_string(Minisat::toInt(model->varOfLit(model->primeLit(lcube[i])).var())) + " ";
+            to_string(Minisat::toInt(model->varOfLit(model->primeLit(lcube[i])).var())+1) + " ";
         }
         invCnf += "0\n";
         invPrimedCnf += "0\n";
