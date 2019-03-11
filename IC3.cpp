@@ -170,12 +170,23 @@ namespace IC3 {
         if (!strengthen()) return Result(false, k, CubeSet());
         // propagate clauses; check for proof
         if (propagate()) {
+          // useful debugging info
+          cout << "Found fixpoint at frame " << fixpointFrame << endl;
+          cout << "Number of clauses per frame " << endl;
+          for (unsigned int i = 0; i < frames.size(); ++i) {
+            cout << "frames[" << i << "].borderCubes.size() = " << frames[i].borderCubes.size() << endl;
+          }
+          int numDupes = 0;
           CubeSet cand_invars;
           for(unsigned int i = fixpointFrame+1; i < frames.size(); ++i) {
             for (CubeSet::const_iterator cube = frames[i].borderCubes.begin(); cube != frames[i].borderCubes.end(); ++cube) {
+              if (cand_invars.find(*cube) != cand_invars.end()) {
+                ++numDupes;
+              }
               cand_invars.insert(*cube);
             }
           }
+          cout << "There were " << numDupes << " duplicate clauses." << endl;
           return Result(true, k, cand_invars);
         }
         printStats();

@@ -164,6 +164,81 @@ int main(int argc, char ** argv) {
     }
   }
 
+  // check the invariants
+
+  Minisat::Lit err_ = model->error();
+  Minisat::Lit primed_err_ = model->primedError();
+
+  IC3::CubeSet toRemove;
+  bool propRemoved = false;
+
+  bool inductive = false;
+  while (!inductive) {
+    inductive = true;
+
+    // debugging
+    // do houdini procedure internally
+    Minisat::Solver * houdini = model->newSolver();
+    model->loadTransitionRelation(*houdini, true);
+    model->loadError(*houdini);
+
+    // add invariants
+    for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
+      const LitVec & invcube = *cube;
+      Minisat::vec<Minisat::Lit> cls;
+      cls.capacity(invcube.size());
+      for (unsigned i = 0; i < invcube.size(); ++i) {
+        // negate to make it a clause
+        cls.push(~invcube[i]);
+      }
+      houdini->addClause(cls);
+    }
+
+    // add property
+    houdini->addClause(~err_);
+    bool transRes = houdini->solve();
+    cout << "transition relation and unprimed invariants (including property) is " << transRes << endl;
+    assert(transRes);
+
+    // check primed invariants
+    // for now, don't even need indicator literal (just solve under assumptions)
+    bool cex;
+    for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
+      const LitVec & invcube = *cube;
+      Minisat::vec<Minisat::Lit> assumps;
+      assumps.capacity(invcube.size());
+      for (unsigned i = 0; i < invcube.size(); ++i) {
+        // don't negate -- cube is negated clause which is what we want
+        assumps.push(model->primeLit(invcube[i]));
+      }
+      cex = houdini->solve(assumps);
+      inductive = inductive & !cex;
+
+      if (cex) {
+        toRemove.insert(*cube);
+      }
+    }
+
+    // check primed property
+    cex = houdini->solve(primed_err_);
+    inductive = inductive & !cex;
+    if (cex) {
+      propRemoved = true;
+    }
+    // end debugging
+
+    cout << "Need to remove " << toRemove.size() << " candidate invariants" << endl;
+    if (propRemoved) {
+      cout << "Property was removed -- uh oh" << endl;
+    }
+    else {
+      cout << "Property was not removed -- phew!" << endl;
+    }
+
+    assert(toRemove.size() == 0);
+    assert(!propRemoved);
+  }
+
   // print 0/1 according to AIGER standard
   cout << !res.rv << endl;
 
