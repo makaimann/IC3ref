@@ -168,6 +168,8 @@ int main(int argc, char ** argv) {
 
   // check the invariants
 
+  if (res.rv)
+  {
   Minisat::Lit err_ = model->error();
   Minisat::Lit primed_err_ = model->primedError();
 
@@ -239,6 +241,7 @@ int main(int argc, char ** argv) {
 
     assert(toRemove.size() == 0);
     assert(!propRemoved);
+  }
   }
 
   // print 0/1 according to AIGER standard
