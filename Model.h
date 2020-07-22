@@ -148,6 +148,8 @@ public:
       return lit;
   }
 
+  const VarVec & getVars() { return vars; };
+
   // Once all primed variables have been created, it locks the Model
   // from creating any further ones.  Then Solver::newVar() may be
   // called safely.
@@ -214,7 +216,8 @@ public:
   // Makai: adding for access in main
   Minisat::SimpSolver * getSimpSolver() { return sslv; }
 
-private:
+
+/* private: */
   VarVec vars;
   const size_t inputs, latches, reps, primes;
 

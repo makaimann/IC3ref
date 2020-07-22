@@ -39,7 +39,7 @@ int main(int argc, char ** argv) {
   unsigned int propertyIndex = 0;
   bool basic = false, random = false;
   bool dumpTrans = false, dumpInv = false;
-  string transFilename = "", invFilename = "", invPrimedFilename = "";
+  string initFilename="", mappingFilename="", transFilename = "", invFilename = "", invPrimedFilename = "";
   int verbose = 0;
   // Makai: Adding option to dump transition relation and final invariants
   //        (when property holds)
@@ -64,6 +64,16 @@ int main(int argc, char ** argv) {
       dumpTrans = true;
       string a = string(argv[i]);
       transFilename = a.substr(8, a.length()-8);
+
+      size_t dotLoc = transFilename.find(".");
+      if (dotLoc == string::npos) {
+        initFilename = transFilename + "-init.cnf";
+        mappingFilename = transFilename + "-mapping.txt";
+      }
+      else {
+        initFilename = transFilename.substr(0, dotLoc) + "-init" + ".cnf";
+        mappingFilename = transFilename.substr(0, dotLoc) + "-mapping.txt";
+      }
     }
     else if (string(argv[i]).substr(0, 6)=="--inv=") {
       // option: dump invariant to file
@@ -113,6 +123,7 @@ int main(int argc, char ** argv) {
       trCnf += "0\n";
     }
     // not sure if I need the trail?
+    // We need the trail because unit clauses are put in the trail automatically
     for (Minisat::TrailIterator c = sslv->trailBegin();
          c != sslv->trailEnd(); ++c) {
       trCnf += (Minisat::sign(*c) ? "-" : "") +
@@ -128,6 +139,39 @@ int main(int argc, char ** argv) {
     trOut << trCnf;
     trOut.close();
   }
+
+  Minisat::Solver * init_solver = model->newSolver();
+  model->loadInitialCondition(*init_solver);
+  ofstream initCnf(initFilename);
+  std::cout << "constraints size " << model->constraints.size() << std::endl;
+  if (model->constraints.empty()) {
+    // an intersection check (AIGER 1.9 w/o invariant constraints)
+    std::cout << "init size " << model->init.size() << std::endl;
+    for (Minisat::Lit lit : model->init)
+    {
+      init_solver->addClause(lit);
+    }
+  }
+
+  for (Minisat::ClauseIterator c = init_solver->clausesBegin(); 
+       c != init_solver->clausesEnd(); ++c) {
+    const Minisat::Clause & cls = *c;
+    for (int i = 0; i < cls.size(); ++i) {
+      initCnf << (Minisat::sign(cls[i]) ? "-" : "");
+      initCnf << to_string(Minisat::toInt(model->varOfLit(cls[i]).var())+1);
+      initCnf << " ";
+    }
+    initCnf << "0\n";
+  }
+
+  for (Minisat::TrailIterator c = init_solver->trailBegin();
+       c != init_solver->trailEnd(); ++c) {
+    initCnf << (Minisat::sign(*c) ? "-" : "");
+    initCnf << to_string(Minisat::toInt(model->varOfLit(*c).var())+1) + " 0\n";
+  }
+
+  initCnf.close();
+  delete init_solver;
 
   // Makai: do something if asked to dump invariant (and result is true)
   if (dumpInv) {
@@ -163,6 +207,20 @@ int main(int argc, char ** argv) {
       invPrimedOut << invPrimedCnf;
       invOut.close();
       invPrimedOut.close();
+
+      ofstream primeMapping(mappingFilename);
+      primeMapping << model->varOfLit(model->error()).var() + 1;
+      primeMapping << " ";
+      primeMapping << model->varOfLit(model->primedError()).var() + 1 << std::endl;
+      for (auto it = model->beginLatches(); it != model->endLatches(); ++it)
+      {
+        Var v = *it;
+        primeMapping << v.var() + 1;
+        primeMapping << " ";
+        primeMapping << model->primeVar(v).var() + 1 << std::endl;
+      }
+      primeMapping.close();
+
     }
   }
 

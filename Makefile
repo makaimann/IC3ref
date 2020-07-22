@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=c++0x -Wall -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -O3 -g
+CFLAGS=-std=c++0x -w -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -O3 -g -fpermissive
 CXX=g++
 
 INCLUDE=-Iminisat -Iminisat/minisat/core -Iminisat/minisat/mtl -Iminisat/minisat/simp -Iaiger
