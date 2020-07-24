@@ -148,8 +148,6 @@ public:
       return lit;
   }
 
-  const VarVec & getVars() { return vars; };
-
   // Once all primed variables have been created, it locks the Model
   // from creating any further ones.  Then Solver::newVar() may be
   // called safely.
