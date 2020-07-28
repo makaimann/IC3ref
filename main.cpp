@@ -38,11 +38,16 @@ extern "C" {
 int main(int argc, char ** argv) {
   unsigned int propertyIndex = 0;
   bool basic = false, random = false;
+  bool dumpFiles = false;
+  string baseDumpFilename = "";
+  // to remove
   bool dumpTrans = false, dumpInv = false;
   string initFilename="", mappingFilename="", transFilename = "", invFilename = "", invPrimedFilename = "";
+  // end to remove
   int verbose = 0;
   // Makai: Adding option to dump transition relation and final invariants
   //        (when property holds)
+  string arg; ///< temporary var
   for (int i = 1; i < argc; ++i) {
     if (string(argv[i]) == "-v")
       // option: verbosity
@@ -59,36 +64,10 @@ int main(int argc, char ** argv) {
     else if (string(argv[i]) == "-b")
       // option: use basic generalization
       basic = true;
-    else if (string(argv[i]).substr(0, 8)=="--trans=") {
-      // option: dump transition relation to file
-      dumpTrans = true;
-      string a = string(argv[i]);
-      transFilename = a.substr(8, a.length()-8);
-
-      size_t dotLoc = transFilename.find(".");
-      if (dotLoc == string::npos) {
-        initFilename = transFilename + "-init.cnf";
-        mappingFilename = transFilename + "-mapping.txt";
-      }
-      else {
-        initFilename = transFilename.substr(0, dotLoc) + "-init" + ".cnf";
-        mappingFilename = transFilename.substr(0, dotLoc) + "-mapping.txt";
-      }
-    }
-    else if (string(argv[i]).substr(0, 6)=="--inv=") {
-      // option: dump invariant to file
-      dumpInv = true;
-      string a = string(argv[i]);
-      invFilename = a.substr(6, a.length()-6);
-      size_t dotLoc = invFilename.find(".");
-      if (dotLoc == string::npos) {
-        invPrimedFilename = invFilename + "-primed";
-      }
-      else {
-        invPrimedFilename = invFilename.substr(0, dotLoc) + "-primed" + invFilename.substr(dotLoc, invFilename.length()-dotLoc);
-      }
-    }
-    else
+    else if ((arg = string(argv[i])).substr(0, 7) == "--dump=") {
+      dumpFiles = true;
+      baseDumpFilename = arg.substr(7, arg.length() - 7);
+    } else
       // optional argument: set property index
       propertyIndex = (unsigned) atoi(argv[i]);
   }
@@ -109,119 +88,156 @@ int main(int argc, char ** argv) {
   IC3::Result res = IC3::check(*model, verbose, basic, random);
 
   // Makai: dump cnf if asked
-  if (dumpTrans) {
+  // TODO: consider putting this in model. Only issue is it doesn't have access
+  // to invariant NOTE: adding 1 to all vars so that they start at 1 instead of
+  // 0, to avoid conflicting
+  //       with the DIMACs format which uses zero as a line terminator
+  if (dumpFiles) {
+    // dumping Trans
+    string transFilename = baseDumpFilename + "-trans.cnf";
     cout << "dumping CNF transition relation to file: " << transFilename << endl;
-    string trCnf = "";
+    ofstream trCnf(transFilename);
     Minisat::SimpSolver* sslv = model->getSimpSolver();
-    for (Minisat::ClauseIterator c = sslv->clausesBegin(); 
+    for (Minisat::ClauseIterator c = sslv->clausesBegin();
          c != sslv->clausesEnd(); ++c) {
       const Minisat::Clause & cls = *c;
       for (int i = 0; i < cls.size(); ++i) {
-        trCnf += (Minisat::sign(cls[i]) ? "-" : "") +
-          to_string(Minisat::toInt(model->varOfLit(cls[i]).var())+1) + " ";
+        trCnf << (Minisat::sign(cls[i]) ? "-" : "") +
+                     to_string(Minisat::toInt(model->varOfLit(cls[i]).var()) +
+                               1) +
+                     " ";
       }
-      trCnf += "0\n";
+      trCnf << "0\n";
     }
-    // not sure if I need the trail?
     // We need the trail because unit clauses are put in the trail automatically
     for (Minisat::TrailIterator c = sslv->trailBegin();
          c != sslv->trailEnd(); ++c) {
-      trCnf += (Minisat::sign(*c) ? "-" : "") +
-        to_string(Minisat::toInt(model->varOfLit(*c).var())+1) + " 0\n";
+      trCnf << (Minisat::sign(*c) ? "-" : "") +
+                   to_string(Minisat::toInt(model->varOfLit(*c).var()) + 1) +
+                   " 0\n";
     }
     LitVec constraints = model->invariantConstraints();
-    for (LitVec::const_iterator i = constraints.begin(); 
-         i != constraints.end(); ++i) {
-      trCnf += (Minisat::sign(model->primeLit(*i)) ? "-" : "") +
-        to_string(Minisat::toInt(model->varOfLit(model->primeLit(*i)).var())+1) + " 0\n";
+    for (LitVec::const_iterator i = constraints.begin(); i != constraints.end();
+         ++i) {
+      trCnf << (Minisat::sign(model->primeLit(*i)) ? "-" : "") +
+                   to_string(Minisat::toInt(
+                                 model->varOfLit(model->primeLit(*i)).var()) +
+                             1) +
+                   " 0\n";
     }
-    ofstream trOut(transFilename);
-    trOut << trCnf;
-    trOut.close();
-  }
+    trCnf.close();
 
-  Minisat::Solver * init_solver = model->newSolver();
-  model->loadInitialCondition(*init_solver);
-  ofstream initCnf(initFilename);
-  std::cout << "constraints size " << model->constraints.size() << std::endl;
-  if (model->constraints.empty()) {
-    // an intersection check (AIGER 1.9 w/o invariant constraints)
-    std::cout << "init size " << model->init.size() << std::endl;
-    for (Minisat::Lit lit : model->init)
-    {
-      init_solver->addClause(lit);
+    // end dumping Trans
+
+    // dump Init
+
+    Minisat::Solver *init_solver = model->newSolver();
+    model->loadInitialCondition(*init_solver);
+    string initFilename = baseDumpFilename + "-init.cnf";
+    cout << "dumping CNF transition relation to file: " << initFilename << endl;
+    ofstream initCnf(initFilename);
+    if (model->constraints.empty()) {
+      // an intersection check (AIGER 1.9 w/o invariant constraints)
+      std::cout << "init size " << model->init.size() << std::endl;
+      for (Minisat::Lit lit : model->init) {
+        init_solver->addClause(lit);
+      }
     }
-  }
 
-  for (Minisat::ClauseIterator c = init_solver->clausesBegin(); 
-       c != init_solver->clausesEnd(); ++c) {
-    const Minisat::Clause & cls = *c;
-    for (int i = 0; i < cls.size(); ++i) {
-      initCnf << (Minisat::sign(cls[i]) ? "-" : "");
-      initCnf << to_string(Minisat::toInt(model->varOfLit(cls[i]).var())+1);
-      initCnf << " ";
+    for (Minisat::ClauseIterator c = init_solver->clausesBegin();
+         c != init_solver->clausesEnd(); ++c) {
+      const Minisat::Clause &cls = *c;
+      for (int i = 0; i < cls.size(); ++i) {
+        initCnf << (Minisat::sign(cls[i]) ? "-" : "");
+        initCnf << to_string(Minisat::toInt(model->varOfLit(cls[i]).var()) + 1);
+        initCnf << " ";
+      }
+      initCnf << "0\n";
     }
-    initCnf << "0\n";
-  }
 
-  for (Minisat::TrailIterator c = init_solver->trailBegin();
-       c != init_solver->trailEnd(); ++c) {
-    initCnf << (Minisat::sign(*c) ? "-" : "");
-    initCnf << to_string(Minisat::toInt(model->varOfLit(*c).var())+1) + " 0\n";
-  }
+    for (Minisat::TrailIterator c = init_solver->trailBegin();
+         c != init_solver->trailEnd(); ++c) {
+      initCnf << (Minisat::sign(*c) ? "-" : "");
+      initCnf << to_string(Minisat::toInt(model->varOfLit(*c).var()) + 1) +
+                     " 0\n";
+    }
 
-  initCnf.close();
-  delete init_solver;
+    initCnf.close();
+    delete init_solver;
 
-  // Makai: do something if asked to dump invariant (and result is true)
-  if (dumpInv) {
+    // end dumping Init
+
+    // dump mapping from unprimed to primed vars
+
+    string mappingFilename = baseDumpFilename + "-mapping.txt";
+    cout << "dumping mapping from unprimed to primed vars to file: "
+         << mappingFilename << endl;
+    ofstream primeMapping(mappingFilename);
+    primeMapping << model->varOfLit(model->error()).var() + 1;
+    primeMapping << " ";
+    primeMapping << model->varOfLit(model->primedError()).var() + 1
+                 << std::endl;
+    for (auto it = model->beginLatches(); it != model->endLatches(); ++it) {
+      Var v = *it;
+      primeMapping << v.var() + 1;
+      primeMapping << " ";
+      primeMapping << model->primeVar(v).var() + 1 << std::endl;
+    }
+    primeMapping.close();
+
+    // end dumping primed mapping
+
+    // dump invariant if result is true
     if (!res.rv) {
       cout << "asked to dump invariant but property does not hold -- aborting." << endl;
     }
     else {
+      string invFilename = baseDumpFilename + "-inv.cnf";
+      string invPrimedFilename = baseDumpFilename + "-inv-primed.cnf";
       cout << "Found " << res.inv.size() << " candidate invariant clauses." << endl;
       cout << "dumping CNF invariant to file: " << invFilename << endl;
       cout << "       and primed CNF to file: " << invPrimedFilename << endl;
-      string invCnf = "", invPrimedCnf = "";
+      ofstream invCnf(invFilename);
+      ofstream invPrimedCnf(invPrimedFilename);
       // dump the property as the first literal
-      invCnf += "c first literal is the property\n";
-      invPrimedCnf += "c first literal is the property\n";
+      invCnf << "c first literal is the property\n";
+      invPrimedCnf << "c first literal is the property\n";
       Minisat::Lit err = model->error();
       // property is negated, so complement it
-      invCnf += (Minisat::sign(err) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(err).var())+1) + " 0\n";
-      invPrimedCnf += (Minisat::sign(err) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(model->primeLit(err)).var())+1) + " 0\n";
+      invCnf << (Minisat::sign(err) ? "" : "-") +
+                    to_string(Minisat::toInt(model->varOfLit(err).var()) + 1) +
+                    " 0\n";
+      invPrimedCnf << (Minisat::sign(err) ? "" : "-") +
+                          to_string(
+                              Minisat::toInt(
+                                  model->varOfLit(model->primeLit(err)).var()) +
+                              1) +
+                          " 0\n";
       for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
         const LitVec & lcube = *cube;
         for (unsigned int i = 0; i < lcube.size(); ++i) {
           // negating the literals
-          invCnf += (Minisat::sign(lcube[i]) ? "" : "-") + to_string(Minisat::toInt(model->varOfLit(lcube[i]).var())+1) + " ";
-          invPrimedCnf += (Minisat::sign(lcube[i]) ? "" : "-") +
-            to_string(Minisat::toInt(model->varOfLit(model->primeLit(lcube[i])).var())+1) + " ";
+          invCnf << (Minisat::sign(lcube[i]) ? "" : "-") +
+                        to_string(
+                            Minisat::toInt(model->varOfLit(lcube[i]).var()) +
+                            1) +
+                        " ";
+          invPrimedCnf
+              << (Minisat::sign(lcube[i]) ? "" : "-") +
+                     to_string(
+                         Minisat::toInt(
+                             model->varOfLit(model->primeLit(lcube[i])).var()) +
+                         1) +
+                     " ";
         }
-        invCnf += "0\n";
-        invPrimedCnf += "0\n";
+        invCnf << "0\n";
+        invPrimedCnf << "0\n";
       }
-      ofstream invOut(invFilename);
-      ofstream invPrimedOut(invPrimedFilename);
-      invOut << invCnf;
-      invPrimedOut << invPrimedCnf;
-      invOut.close();
-      invPrimedOut.close();
-
-      ofstream primeMapping(mappingFilename);
-      primeMapping << model->varOfLit(model->error()).var() + 1;
-      primeMapping << " ";
-      primeMapping << model->varOfLit(model->primedError()).var() + 1 << std::endl;
-      for (auto it = model->beginLatches(); it != model->endLatches(); ++it)
-      {
-        Var v = *it;
-        primeMapping << v.var() + 1;
-        primeMapping << " ";
-        primeMapping << model->primeVar(v).var() + 1 << std::endl;
-      }
-      primeMapping.close();
-
+      invCnf.close();
+      invPrimedCnf.close();
     }
+
+    // end dumping invariant
   }
 
   // check the invariants
@@ -239,12 +255,12 @@ int main(int argc, char ** argv) {
     inductive = true;
 
     // debugging
-    // do houdini procedure internally
-    Minisat::Solver * houdini = model->newSolver();
-    model->loadTransitionRelation(*houdini, true);
-    model->loadError(*houdini);
+    // do clause dropping procedure internally
+    Minisat::Solver *dropper = model->newSolver();
+    model->loadTransitionRelation(*dropper, true);
+    model->loadError(*dropper);
 
-    // add invariants
+    // add invariant clauses
     for (IC3::CubeSet::const_iterator cube = res.inv.begin(); cube != res.inv.end(); ++cube) {
       const LitVec & invcube = *cube;
       Minisat::vec<Minisat::Lit> cls;
@@ -253,12 +269,12 @@ int main(int argc, char ** argv) {
         // negate to make it a clause
         cls.push(~invcube[i]);
       }
-      houdini->addClause(cls);
+      dropper->addClause(cls);
     }
 
     // add property
-    houdini->addClause(~err_);
-    bool transRes = houdini->solve();
+    dropper->addClause(~err_);
+    bool transRes = dropper->solve();
     cout << "transition relation and unprimed invariants (including property) is " << transRes << endl;
     assert(transRes);
 
@@ -273,7 +289,7 @@ int main(int argc, char ** argv) {
         // don't negate -- cube is negated clause which is what we want
         assumps.push(model->primeLit(invcube[i]));
       }
-      cex = houdini->solve(assumps);
+      cex = dropper->solve(assumps);
       inductive = inductive & !cex;
 
       if (cex) {
@@ -282,7 +298,7 @@ int main(int argc, char ** argv) {
     }
 
     // check primed property
-    cex = houdini->solve(primed_err_);
+    cex = dropper->solve(primed_err_);
     inductive = inductive & !cex;
     if (cex) {
       propRemoved = true;
